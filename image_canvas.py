@@ -10,6 +10,7 @@ from ui.components.point_manager import PointManager
 from ui.components.magnifier import MagnifierTool
 from ui.components.sniper_mode import SniperModeManager
 from ui.utils import _cv_to_qpixmap
+from ui.views.landing_view import LandingView
 
 
 class ImageCanvas(QtWidgets.QWidget):
@@ -24,6 +25,7 @@ class ImageCanvas(QtWidgets.QWidget):
     """
     fourPointsSelected = QtCore.pyqtSignal(object)
     requestLoadImage = QtCore.pyqtSignal()
+    requestLoadBatch = QtCore.pyqtSignal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -50,63 +52,17 @@ class ImageCanvas(QtWidgets.QWidget):
         # Modo sniper/precisión
         self._sniper = SniperModeManager()
 
-        # Pantalla de inicio interna (landing): layout y widget contenedor
+        # Landing view (extracted UI)
         self._main_layout = QtWidgets.QVBoxLayout(self)
         self._main_layout.setContentsMargins(0, 0, 0, 0)
         self._main_layout.setSpacing(0)
 
-        self._landing_widget = QtWidgets.QWidget(self)
-        landing_layout = QtWidgets.QVBoxLayout(self._landing_widget)
-        landing_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        landing_layout.setSpacing(12)
-        landing_layout.setContentsMargins(24, 24, 24, 24)
-
-        welcome = QtWidgets.QLabel('Bienvenido a <span style="color: #0E3468;">HICutter</span>')
-        welcome.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        welcome_font = welcome.font()
-        welcome_font.setPointSize(27)
-        welcome_font.setBold(True)
-        welcome.setFont(welcome_font)
-        welcome.setStyleSheet('background-color: transparent')
-
-        label = QtWidgets.QLabel('Selecciona la opcion de carga para iniciar el procesamiento')
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        label_font = label.font()
-        label_font.setPointSize(20)
-        label_font.setBold(False)
-        label.setFont(label_font)
-        label.setStyleSheet('background-color: transparent')
-
-        btn_batch = QtWidgets.QPushButton('Cargar Lote')
-        btn_batch_font = btn_batch.font()
-        btn_batch_font.setPointSize(16)
-        btn_batch_font.setBold(False)
-        btn_batch.setFont(btn_batch_font)
-        btn_batch.setMinimumHeight(50)
-        btn_batch.setFixedWidth(300)
-        btn_batch.setStyleSheet('background-color: #252525; color: #EDEDED; border: 3px solid #0E3468; border-radius: 6px; padding: 8px;')
-
-        btn_image = QtWidgets.QPushButton('Cargar Imagen')
-        btn_image_font = btn_image.font()
-        btn_image_font.setPointSize(16)
-        btn_image_font.setBold(False)
-        btn_image.setFont(btn_image_font)
-        btn_image.setMinimumHeight(50)
-        btn_image.setFixedWidth(300)
-        btn_image.setStyleSheet('background-color: #252525; color: #EDEDED; border: 3px solid #0E3468; border-radius: 6px; padding: 8px;')
-        btn_image.clicked.connect(lambda: self.requestLoadImage.emit())
-
-        landing_layout.addStretch(1)
-        landing_layout.addWidget(welcome)
-        landing_layout.addSpacing(15)
-        landing_layout.addWidget(label)
-        landing_layout.addSpacing(70)
-        landing_layout.addWidget(btn_image, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        landing_layout.addWidget(btn_batch, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
-        landing_layout.addStretch(1)
-
-        self._main_layout.addWidget(self._landing_widget, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self._landing_widget.show()
+        self._landing_view = LandingView(self)
+        # Forward landing signals to the canvas-level signals so callers (MainWindow) can connect to the canvas
+        self._landing_view.requestLoadImage.connect(lambda: self.requestLoadImage.emit())
+        self._landing_view.requestLoadBatch.connect(lambda: self.requestLoadBatch.emit())
+        self._main_layout.addWidget(self._landing_view, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._landing_view.show()
 
         # Shortcut para alternar la lupa con la tecla 'L' (funciona aunque el widget no tenga foco)
         shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('L'), self)
@@ -137,10 +93,7 @@ class ImageCanvas(QtWidgets.QWidget):
         # actualizar la referencia del manager
         self._scaled_manager.set_pixmap(self._pixmap)
         # ocultar pantalla de inicio al cargar imagen
-        try:
-            self._landing_widget.hide()
-        except Exception:
-            pass
+        self._landing_view.hide()
         # actualizar caché escalado
         self._update_scaled_pixmap_cache()
         # reset points
@@ -373,8 +326,7 @@ class ImageCanvas(QtWidgets.QWidget):
         self._mouse_in_img = False
         self.unsetCursor()
         # mostrar la pantalla de inicio al descargar la imagen
-        # mostrar la pantalla de inicio al descargar la imagen
-        self._landing_widget.show()
+        self._landing_view.show()
         self.update()
 
     # Ordering logic moved to `PointManager` in ui/components/point_manager.py
