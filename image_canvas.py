@@ -9,6 +9,7 @@ from ui.components.geometry import ScaledPixmapManager
 from ui.components.point_manager import PointManager
 from ui.components.magnifier import MagnifierTool
 from ui.components.sniper_mode import SniperModeManager
+from ui.utils import _cv_to_qpixmap
 
 
 class ImageCanvas(QtWidgets.QWidget):
@@ -108,11 +109,8 @@ class ImageCanvas(QtWidgets.QWidget):
         self._landing_widget.show()
 
         # Shortcut para alternar la lupa con la tecla 'L' (funciona aunque el widget no tenga foco)
-        try:
-            shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('L'), self)
-            shortcut_l.activated.connect(lambda: self._toggle_magnifier())
-        except Exception:
-            pass
+        shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('L'), self)
+        shortcut_l.activated.connect(lambda: self._toggle_magnifier())
 
     def _toggle_magnifier(self) -> None:
         self._magnifier_enabled = not self._magnifier_enabled
@@ -135,7 +133,7 @@ class ImageCanvas(QtWidgets.QWidget):
             # copiar para evitar aliasing accidental
             self.cv_image = cv_image.copy()
 
-        self._pixmap = self._cv_to_qpixmap(self.cv_image)
+        self._pixmap = _cv_to_qpixmap(self.cv_image)
         # actualizar la referencia del manager
         self._scaled_manager.set_pixmap(self._pixmap)
         # ocultar pantalla de inicio al cargar imagen
@@ -149,15 +147,7 @@ class ImageCanvas(QtWidgets.QWidget):
         self._point_manager.reset()
         self.update()
 
-    def _cv_to_qpixmap(self, img: np.ndarray) -> QtGui.QPixmap:
-        h, w = img.shape[:2]
-        if img.ndim == 2 or img.shape[2] == 1:
-            qimg = QtGui.QImage(img.tobytes(), w, h, w, QtGui.QImage.Format.Format_Grayscale8)
-        else:
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            bytes_per_line = 3 * w
-            qimg = QtGui.QImage(rgb.tobytes(), w, h, bytes_per_line, QtGui.QImage.Format.Format_RGB888)
-        return QtGui.QPixmap.fromImage(qimg)
+    # Image conversion moved to `ui.utils._cv_to_qpixmap`
 
     def _create_cross_cursor(self, cross_len: int) -> QtGui.QCursor:
         """Crea un QCursor con una cruceta roja centrada."""
@@ -218,27 +208,21 @@ class ImageCanvas(QtWidgets.QWidget):
             return
 
         self.cv_image = cv2.rotate(self.cv_image, code)
-        self._pixmap = self._cv_to_qpixmap(self.cv_image)
+        self._pixmap = _cv_to_qpixmap(self.cv_image)
 
         # actualizar caché escalado tras rotación
         self._update_scaled_pixmap_cache()
         # desactivar lupa al rotar
         self._magnifier_enabled = False
         # desactivar modo precisión si está activo y restaurar cursor
-        try:
-            self._sniper.deactivate(self)
-        except Exception:
-            pass
+        self._sniper.deactivate(self)
 
         # limpiar puntos tras rotación
         self._point_manager.reset()
 
         # dejar de seguir el cursor y restaurar puntero
         self._mouse_in_img = False
-        try:
-            self.unsetCursor()
-        except Exception:
-            pass
+        self.unsetCursor()
 
         self.update()
 
@@ -267,39 +251,31 @@ class ImageCanvas(QtWidgets.QWidget):
         current mouse position, hide the system cursor and lock the system pointer to
         the widget center to allow infinite relative movement.
         """
-        try:
-            key = event.key()
-            # Toggle magnifier
-            if key == QtCore.Qt.Key.Key_L:
-                self._magnifier_enabled = not self._magnifier_enabled
-                self.update()
-                return
+        key = event.key()
+        # Toggle magnifier
+        if key == QtCore.Qt.Key.Key_L:
+            self._magnifier_enabled = not self._magnifier_enabled
+            self.update()
+            return
 
-            # Delegate sniper/precision handling
-            try:
-                handled = self._sniper.handle_key_press(event, self)
-                if handled:
-                    self.update()
-                    return
-            except Exception:
-                pass
-        except Exception:
-            pass
+        # Delegate sniper/precision handling
+        handled, mwx, mwy = self._sniper.handle_key_press(event, self)
+        if handled:
+            if mwx is not None and mwy is not None:
+                self._mouse_wx = mwx
+                self._mouse_wy = mwy
+            self.update()
+            return
+
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
         """Handle Shift release to exit precision/sniper mode and restore cursor."""
-        try:
-            key = event.key()
-            try:
-                handled = self._sniper.handle_key_release(event, self)
-                if handled:
-                    self.update()
-                    return
-            except Exception:
-                pass
-        except Exception:
-            pass
+        key = event.key()
+        handled = self._sniper.handle_key_release(event, self)
+        if handled:
+            self.update()
+            return
         super().keyReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
@@ -310,19 +286,16 @@ class ImageCanvas(QtWidgets.QWidget):
         (bloqueando el cursor en el centro con `QCursor.setPos`).
         """
         # Delegate sniper precision movement
-        try:
-            handled, mwx, mwy, min_img = self._sniper.handle_mouse_move(event, self)
-            if handled:
-                # update canvas state from sniper
-                if mwx is not None and mwy is not None:
-                    self._mouse_wx = mwx
-                    self._mouse_wy = mwy
-                if isinstance(min_img, bool):
-                    self._mouse_in_img = min_img
-                self.update()
-                return
-        except Exception:
-            pass
+        handled, mwx, mwy, min_img = self._sniper.handle_mouse_move(event, self)
+        if handled:
+            # update canvas state from sniper
+            if mwx is not None and mwy is not None:
+                self._mouse_wx = mwx
+                self._mouse_wy = mwy
+            if isinstance(min_img, bool):
+                self._mouse_in_img = min_img
+            self.update()
+            return
 
         # Comportamiento normal cuando no hay modo precisión
         wx = int(event.position().x())
@@ -330,21 +303,15 @@ class ImageCanvas(QtWidgets.QWidget):
         img_pt = self.widget_to_image_coords(wx, wy)
         # Solo seguir el cursor si aún no se han colocado los 4 puntos
         if img_pt is not None and len(self._point_manager) < 4:
-            self._mouse_in_img = True
-            self._mouse_wx = wx
-            self._mouse_wy = wy
-            # cambiar cursor a cruceta roja
-            try:
-                self.setCursor(self._cross_cursor)
-            except Exception:
-                pass
+             self._mouse_in_img = True
+             self._mouse_wx = wx
+             self._mouse_wy = wy
+             # cambiar cursor a cruceta roja
+             self.setCursor(self._cross_cursor)
         else:
             if self._mouse_in_img:
                 self._mouse_in_img = False
-                try:
-                    self.unsetCursor()
-                except Exception:
-                    pass
+                self.unsetCursor()
         # repintar para mostrar líneas punteadas de referencia
         self.update()
 
@@ -364,15 +331,9 @@ class ImageCanvas(QtWidgets.QWidget):
                     self.fourPointsSelected.emit(ordered)
                     # desactivar lupa y modo precisión al completar los 4 puntos
                     self._magnifier_enabled = False
-                    try:
-                        self._sniper.deactivate(self)
-                    except Exception:
-                        pass
+                    self._sniper.deactivate(self)
                     self._mouse_in_img = False
-                    try:
-                        self.unsetCursor()
-                    except Exception:
-                        pass
+                    self.unsetCursor()
                 self.update()
         elif event.button() == QtCore.Qt.MouseButton.RightButton:
             # remove last
@@ -404,23 +365,16 @@ class ImageCanvas(QtWidgets.QWidget):
         self.cv_image = None
         self._pixmap = None
         # reset manager cache
-        try:
-            self._scaled_manager.set_pixmap(None)
-        except Exception:
-            pass
+        # Reset scaled manager cache
+        self._scaled_manager.set_pixmap(None)
 
         self._point_manager.reset()
         self._magnifier_enabled = False
         self._mouse_in_img = False
-        try:
-            self.unsetCursor()
-        except Exception:
-            pass
+        self.unsetCursor()
         # mostrar la pantalla de inicio al descargar la imagen
-        try:
-            self._landing_widget.show()
-        except Exception:
-            pass
+        # mostrar la pantalla de inicio al descargar la imagen
+        self._landing_widget.show()
         self.update()
 
     # Ordering logic moved to `PointManager` in ui/components/point_manager.py
@@ -503,16 +457,10 @@ class ImageCanvas(QtWidgets.QWidget):
             wfx, wfy = self._sniper.get_current_widget_pos(None, self)
             img_pt = self.widget_to_image_coords(wfx, wfy)
             if img_pt is not None:
-                try:
-                    # pasar posición widget en enteros para el overlay
-                    widget_pos = (int(round(wfx)), int(round(wfy)))
-                except Exception:
-                    widget_pos = (self._mouse_wx, self._mouse_wy)
+                # pasar posición widget en enteros para el overlay
+                widget_pos = (int(round(wfx)), int(round(wfy)))
                 # delegar dibujo a la herramienta
-                try:
-                    self._magnifier.draw(painter, widget_pos, img_pt, self.cv_image, widget=self, cross_len=self.cross_len)
-                except Exception:
-                    pass
+                self._magnifier.draw(painter, widget_pos, img_pt, self.cv_image, widget=self, cross_len=self.cross_len)
 
         painter.end()
 

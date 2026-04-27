@@ -21,32 +21,36 @@ class SniperModeManager:
         self.saved_cursor: Optional[QtGui.QCursor] = None
         self.sensitivity: float = float(sensitivity)
 
-    def handle_key_press(self, event: QtGui.QKeyEvent, widget: QtGui.QWidget) -> bool:
-        try:
-            key = event.key()
-            if key == QtCore.Qt.Key.Key_Shift and not event.isAutoRepeat():
-                if not self.active:
-                    gpos = QtGui.QCursor.pos()
-                    wpos = widget.mapFromGlobal(gpos)
-                    self.virtual_cursor_pos = QtCore.QPointF(float(wpos.x()), float(wpos.y()))
-                    self.saved_cursor = widget.cursor()
-                    try:
-                        widget.setCursor(QtCore.Qt.CursorShape.BlankCursor)
-                    except Exception:
-                        pass
-                    # lock physical cursor to center to allow infinite relative motion
-                    center_global = widget.mapToGlobal(widget.rect().center())
-                    try:
-                        QtGui.QCursor.setPos(center_global)
-                    except Exception:
-                        pass
-                    widget._mouse_wx = int(round(self.virtual_cursor_pos.x()))
-                    widget._mouse_wy = int(round(self.virtual_cursor_pos.y()))
-                    self.active = True
-                    return True
-        except Exception:
-            pass
-        return False
+    def handle_key_press(self, event: QtGui.QKeyEvent, widget: QtGui.QWidget) -> tuple[bool, Optional[int], Optional[int]]:
+        """Handle key press to enter sniper/precision mode.
+
+        Returns a tuple (handled, mouse_wx, mouse_wy). When handled==True the
+        returned widget coordinates should be applied by the caller (ImageCanvas).
+        """
+        key = event.key()
+        if key == QtCore.Qt.Key.Key_Shift and not event.isAutoRepeat():
+            if not self.active:
+                gpos = QtGui.QCursor.pos()
+                wpos = widget.mapFromGlobal(gpos)
+                self.virtual_cursor_pos = QtCore.QPointF(float(wpos.x()), float(wpos.y()))
+                self.saved_cursor = widget.cursor()
+                try:
+                    widget.setCursor(QtCore.Qt.CursorShape.BlankCursor)
+                except Exception:
+                    # TODO: Implement logging
+                    pass
+                # lock physical cursor to center to allow infinite relative motion
+                center_global = widget.mapToGlobal(widget.rect().center())
+                try:
+                    QtGui.QCursor.setPos(center_global)
+                except Exception:
+                    # TODO: Implement logging
+                    pass
+                self.active = True
+                mouse_wx = int(round(self.virtual_cursor_pos.x()))
+                mouse_wy = int(round(self.virtual_cursor_pos.y()))
+                return True, mouse_wx, mouse_wy
+        return False, None, None
 
     def handle_key_release(self, event: QtGui.QKeyEvent, widget: QtGui.QWidget) -> bool:
         try:

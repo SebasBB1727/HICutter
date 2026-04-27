@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from PyQt6 import QtGui, QtCore
+from ui.utils import _cv_to_qpixmap
 
 
 class MagnifierTool:
@@ -56,14 +57,8 @@ class MagnifierTool:
 
         magnified = cv2.resize(patch, (self.size, self.size), interpolation=cv2.INTER_NEAREST)
 
-        h, w = magnified.shape[:2]
-        if magnified.ndim == 2 or (magnified.ndim == 3 and magnified.shape[2] == 1):
-            qimg = QtGui.QImage(magnified.tobytes(), w, h, w, QtGui.QImage.Format.Format_Grayscale8)
-        else:
-            rgb = cv2.cvtColor(magnified, cv2.COLOR_BGR2RGB)
-            bytes_per_line = 3 * w
-            qimg = QtGui.QImage(rgb.tobytes(), w, h, bytes_per_line, QtGui.QImage.Format.Format_RGB888)
-        mag_pix = QtGui.QPixmap.fromImage(qimg)
+        # Use centralized conversion util to obtain a QPixmap
+        mag_pix = _cv_to_qpixmap(magnified)
 
         ow = self.size
         oh = self.size
