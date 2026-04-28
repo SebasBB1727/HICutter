@@ -10,7 +10,6 @@ from ui.components.point_manager import PointManager
 from ui.components.magnifier import MagnifierTool
 from ui.components.sniper_mode import SniperModeManager
 from ui.utils import _cv_to_qpixmap
-from ui.views.landing_view import LandingView
 
 
 class ImageCanvas(QtWidgets.QWidget):
@@ -52,20 +51,8 @@ class ImageCanvas(QtWidgets.QWidget):
         # Modo sniper/precisión
         self._sniper = SniperModeManager()
 
-        # Landing view (extracted UI)
-        self._main_layout = QtWidgets.QVBoxLayout(self)
-        self._main_layout.setContentsMargins(0, 0, 0, 0)
-        self._main_layout.setSpacing(0)
-
-        self._landing_view = LandingView(self)
-        # Forward landing signals to the canvas-level signals so callers (MainWindow) can connect to the canvas
-        self._landing_view.requestLoadImage.connect(lambda: self.requestLoadImage.emit())
-        self._landing_view.requestLoadBatch.connect(lambda: self.requestLoadBatch.emit())
-        self._main_layout.addWidget(self._landing_view, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self._landing_view.show()
-
-        # Shortcut para alternar la lupa con la tecla 'L' (funciona aunque el widget no tenga foco)
-        shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('L'), self)
+        # Shortcut para alternar la lupa con la tecla 'A' (funciona aunque el widget no tenga foco)
+        shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('A'), self)
         shortcut_l.activated.connect(lambda: self._toggle_magnifier())
 
     def _toggle_magnifier(self) -> None:
@@ -92,8 +79,6 @@ class ImageCanvas(QtWidgets.QWidget):
         self._pixmap = _cv_to_qpixmap(self.cv_image)
         # actualizar la referencia del manager
         self._scaled_manager.set_pixmap(self._pixmap)
-        # ocultar pantalla de inicio al cargar imagen
-        self._landing_view.hide()
         # actualizar caché escalado
         self._update_scaled_pixmap_cache()
         # reset points
@@ -123,7 +108,7 @@ class ImageCanvas(QtWidgets.QWidget):
     # ---------- Utilidades de mapeo coordenadas
     def _scaled_pixmap_and_offset(self) -> Tuple[Optional[QtGui.QPixmap], int, int]:
         """Devuelve (scaled_pixmap, left, top) para centrar la imagen en el widget.
-        Usa caché `self._scaled_pixmap_cache` actualizada sólo en load_image, rotate_cv y resizeEvent.
+        Usa caché `self._scaled_pixmap_cache` actualizada sólo en `load_image` y `resizeEvent`.
         """
         if self._pixmap is None:
             return None, 0, 0
@@ -137,7 +122,7 @@ class ImageCanvas(QtWidgets.QWidget):
     def _update_scaled_pixmap_cache(self) -> None:
         """Actualiza `self._scaled_pixmap_cache`, `left` y `top` en función
         del tamaño actual del widget y `self._pixmap`.
-        Se debe llamar sólo en `load_image`, `rotate_cv` y `resizeEvent`.
+        Se debe llamar sólo en `load_image` y `resizeEvent`.
         """
         # Delegate scaled-cache computation to the manager
         self._scaled_manager.set_pixmap(self._pixmap)
@@ -152,44 +137,7 @@ class ImageCanvas(QtWidgets.QWidget):
     def image_to_widget_coords(self, ix: float, iy: float) -> Optional[Tuple[int, int]]:
         return self._scaled_manager.image_to_widget_coords(ix, iy)
 
-    # ---------- Rotaciones (OpenCV)
-    def rotate_cv(self, code: int) -> None:
-        """Rota `self.cv_image` usando `cv2.rotate` con el código dado y actualiza la vista.
-        Después de rotar se limpian los puntos seleccionados y se restaura el cursor.
-        """
-        if self.cv_image is None:
-            return
-
-        self.cv_image = cv2.rotate(self.cv_image, code)
-        self._pixmap = _cv_to_qpixmap(self.cv_image)
-
-        # actualizar caché escalado tras rotación
-        self._update_scaled_pixmap_cache()
-        # desactivar lupa al rotar
-        self._magnifier_enabled = False
-        # desactivar modo precisión si está activo y restaurar cursor
-        self._sniper.deactivate(self)
-
-        # limpiar puntos tras rotación
-        self._point_manager.reset()
-
-        # dejar de seguir el cursor y restaurar puntero
-        self._mouse_in_img = False
-        self.unsetCursor()
-
-        self.update()
-
-    def rotate_right(self) -> None:
-        """Rotar 90° en sentido horario."""
-        self.rotate_cv(cv2.ROTATE_90_CLOCKWISE)
-
-    def rotate_left(self) -> None:
-        """Rotar 90° en sentido antihorario."""
-        self.rotate_cv(cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-    def rotate_180(self) -> None:
-        """Rotar 180°."""
-        self.rotate_cv(cv2.ROTATE_180)
+    # NOTE: Rotations are handled in the core and orchestrated by MainWindow.
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         # Actualizar el pixmap escalado cuando cambia el tamaño del widget
@@ -325,8 +273,7 @@ class ImageCanvas(QtWidgets.QWidget):
         self._magnifier_enabled = False
         self._mouse_in_img = False
         self.unsetCursor()
-        # mostrar la pantalla de inicio al descargar la imagen
-        self._landing_view.show()
+        # no hay pantalla de inicio embebida en el canvas (orquestada por MainWindow)
         self.update()
 
     # Ordering logic moved to `PointManager` in ui/components/point_manager.py

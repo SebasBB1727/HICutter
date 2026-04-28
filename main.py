@@ -1,7 +1,7 @@
 from PyQt6 import QtWidgets, QtGui, QtCore
 import sys
 import cv2
-from core.processor import process_perspective_crop
+from core.processor import process_perspective_crop, rotate_image
 
 from image_canvas import ImageCanvas
 from ui.views.landing_view import LandingView
@@ -49,15 +49,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# Botones de rotación (90° derecha, 90° izquierda, 180°)
 		self.rotate_right_action = QtGui.QAction('Rotar 90° →', self)
-		self.rotate_right_action.triggered.connect(self.canvas.rotate_right)
+		self.rotate_right_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_90_CLOCKWISE))
 		self.toolbar.addAction(self.rotate_right_action)
 
 		self.rotate_left_action = QtGui.QAction('Rotar 90° ←', self)
-		self.rotate_left_action.triggered.connect(self.canvas.rotate_left)
+		self.rotate_left_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_90_COUNTERCLOCKWISE))
 		self.toolbar.addAction(self.rotate_left_action)
 
 		self.rotate_180_action = QtGui.QAction('Rotar 180°', self)
-		self.rotate_180_action.triggered.connect(self.canvas.rotate_180)
+		self.rotate_180_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_180))
 		self.toolbar.addAction(self.rotate_180_action)
 
 		# Atajo Enter: guarda puntos si ya se tienen 4
@@ -68,7 +68,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		# Atajos Alt+1 (rotar 90° derecha) y Alt+2 (guardar puntos cuando hay 4)
 		self.shortcut_alt1 = QtGui.QShortcut(QtGui.QKeySequence('Alt+1'), self)
-		self.shortcut_alt1.activated.connect(self.canvas.rotate_right)
+		self.shortcut_alt1.activated.connect(lambda: self._apply_rotation(cv2.ROTATE_90_CLOCKWISE))
 		self.shortcut_alt2 = QtGui.QShortcut(QtGui.QKeySequence('Alt+2'), self)
 		self.shortcut_alt2.activated.connect(self._on_enter_key)
 
@@ -119,6 +119,14 @@ class MainWindow(QtWidgets.QMainWindow):
 		# Wrapper that accepts optional path from LandingView signal
 		path = args[0] if args else None
 		self.load_image(path)
+
+	def _apply_rotation(self, code: int) -> None:
+		"""Apply rotation (via core.rotate_image) and reload into the canvas."""
+		if self.canvas.cv_image is None:
+			return
+		rotated = rotate_image(self.canvas.cv_image, code)
+		# reload the rotated image into the canvas
+		self.canvas.load_image(cv_image=rotated)
 
 	def update_toolbar_state(self, editor_active: bool) -> None:
 		# Mostrar/activar acciones y atajos solo cuando el editor está activo

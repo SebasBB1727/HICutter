@@ -51,3 +51,12 @@ def process_perspective_crop(cv_image: np.ndarray, points: np.ndarray) -> np.nda
     M = cv2.getPerspectiveTransform(pts, dst)
     warped = cv2.warpPerspective(cv_image, M, (maxWidth, maxHeight), flags=cv2.INTER_LANCZOS4)
     return warped
+
+
+def rotate_image(cv_image: np.ndarray, code: int) -> np.ndarray:
+    """Return a rotated copy of `cv_image` using OpenCV rotate codes.
+
+    This is a pure function placed in the core so UI components do not
+    perform image transformations directly.
+    """
+    return cv2.rotate(cv_image, code)
