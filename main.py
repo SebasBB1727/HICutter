@@ -4,19 +4,27 @@ import cv2
 from core.processor import process_perspective_crop
 
 from image_canvas import ImageCanvas
+from ui.views.landing_view import LandingView
 
 
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self) -> None:
 		super().__init__()
 		self.setWindowTitle('HICutter - Historical Image Cutter')
+
+		# Stacked widget: 0 = LandingView, 1 = ImageCanvas (editor)
+		self.stack = QtWidgets.QStackedWidget()
+		self.landing = LandingView()
 		self.canvas = ImageCanvas()
-		self.setCentralWidget(self.canvas)
+		self.stack.addWidget(self.landing)
+		self.stack.addWidget(self.canvas)
+		self.setCentralWidget(self.stack)
 		self.current_image_path: str | None = None
 
-		toolbar = self.addToolBar('main')
+		# Toolbar
+		self.toolbar = self.addToolBar('main')
 		# Aplicar estilo consistente a los botones del toolbar (borde #252525)
-		toolbar.setStyleSheet("""
+		self.toolbar.setStyleSheet("""
 		QToolButton {
 			border: 1px solid #0E3468;
 			background: transparent;
@@ -28,53 +36,72 @@ class MainWindow(QtWidgets.QMainWindow):
 		}
 		""")
 
-		reset_action = QtGui.QAction('Reiniciar puntos', self)
-		reset_action.triggered.connect(self.canvas.reset_points)
-		toolbar.addAction(reset_action)
+		# Actions (kept as attributes to toggle visibility/state)
+		self.reset_action = QtGui.QAction('Reiniciar puntos', self)
+		self.reset_action.triggered.connect(self.canvas.reset_points)
+		self.toolbar.addAction(self.reset_action)
 
-		save_action = QtGui.QAction('Guardar puntos', self)
-		save_action.triggered.connect(self.save_points)
-		toolbar.addAction(save_action)
+		self.save_action = QtGui.QAction('Guardar puntos', self)
+		self.save_action.triggered.connect(self.save_points)
+		self.toolbar.addAction(self.save_action)
 
 		self.canvas.fourPointsSelected.connect(self.on_four_points)
-		self.canvas.requestLoadImage.connect(self.load_image)
 
 		# Botones de rotación (90° derecha, 90° izquierda, 180°)
-		rotate_right_action = QtGui.QAction('Rotar 90° →', self)
-		rotate_right_action.triggered.connect(self.canvas.rotate_right)
-		toolbar.addAction(rotate_right_action)
+		self.rotate_right_action = QtGui.QAction('Rotar 90° →', self)
+		self.rotate_right_action.triggered.connect(self.canvas.rotate_right)
+		self.toolbar.addAction(self.rotate_right_action)
 
-		rotate_left_action = QtGui.QAction('Rotar 90° ←', self)
-		rotate_left_action.triggered.connect(self.canvas.rotate_left)
-		toolbar.addAction(rotate_left_action)
+		self.rotate_left_action = QtGui.QAction('Rotar 90° ←', self)
+		self.rotate_left_action.triggered.connect(self.canvas.rotate_left)
+		self.toolbar.addAction(self.rotate_left_action)
 
-		rotate_180_action = QtGui.QAction('Rotar 180°', self)
-		rotate_180_action.triggered.connect(self.canvas.rotate_180)
-		toolbar.addAction(rotate_180_action)
+		self.rotate_180_action = QtGui.QAction('Rotar 180°', self)
+		self.rotate_180_action.triggered.connect(self.canvas.rotate_180)
+		self.toolbar.addAction(self.rotate_180_action)
 
 		# Atajo Enter: guarda puntos si ya se tienen 4
-		shortcut_return = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
-		shortcut_return.activated.connect(self._on_enter_key)
-		shortcut_enter = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Enter), self)
-		shortcut_enter.activated.connect(self._on_enter_key)
+		self.shortcut_return = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
+		self.shortcut_return.activated.connect(self._on_enter_key)
+		self.shortcut_enter = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Enter), self)
+		self.shortcut_enter.activated.connect(self._on_enter_key)
 
 		# Atajos Alt+1 (rotar 90° derecha) y Alt+2 (guardar puntos cuando hay 4)
-		shortcut_alt1 = QtGui.QShortcut(QtGui.QKeySequence('Alt+1'), self)
-		shortcut_alt1.activated.connect(self.canvas.rotate_right)
-		shortcut_alt2 = QtGui.QShortcut(QtGui.QKeySequence('Alt+2'), self)
-		shortcut_alt2.activated.connect(self._on_enter_key)
+		self.shortcut_alt1 = QtGui.QShortcut(QtGui.QKeySequence('Alt+1'), self)
+		self.shortcut_alt1.activated.connect(self.canvas.rotate_right)
+		self.shortcut_alt2 = QtGui.QShortcut(QtGui.QKeySequence('Alt+2'), self)
+		self.shortcut_alt2.activated.connect(self._on_enter_key)
 
-	def load_image(self) -> None:
-		fname, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Abrir imagen', 'input', 'Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)')
-		if not fname:
-			QtWidgets.QMessageBox.information(self, 'Aviso', 'No se selecciono ninguna carpeta')
-			return
+		# Conectar la señal de la LandingView para abrir imagen
+		try:
+			self.landing.requestLoadImage.connect(self._handle_request_load_image)
+		except Exception:
+			# Si LandingView no tiene la señal, seguir sin error
+			pass
+
+		# Actualizar estado del toolbar cuando cambia la vista
+		self.stack.currentChanged.connect(lambda idx: self.update_toolbar_state(idx == 1))
+		# Mostrar la LandingView inicialmente
+		self.stack.setCurrentIndex(0)
+		self.update_toolbar_state(False)
+
+	def load_image(self, path: str | None = None) -> None:
+		# Si se proporciona `path`, úsalo; si no, abrir dialogo de archivo
+		if path is None:
+			fname, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Abrir imagen', 'input', 'Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)')
+			if not fname:
+				QtWidgets.QMessageBox.information(self, 'Aviso', 'No se selecciono ninguna carpeta')
+				return
+		else:
+			fname = path
 		img = cv2.imread(fname)
 		if img is None:
 			QtWidgets.QMessageBox.warning(self, 'Error', 'No se pudo cargar la imagen')
 			return
 		self.current_image_path = fname
 		self.canvas.load_image(cv_image=img)
+		# Cambiar a la vista del editor
+		self.stack.setCurrentIndex(1)
 
 
 	def on_four_points(self, pts) -> None:
@@ -87,6 +114,23 @@ class MainWindow(QtWidgets.QMainWindow):
 		pts = self.canvas.get_points()
 		if pts.shape[0] == 4:
 			self.save_points()
+
+	def _handle_request_load_image(self, *args) -> None:
+		# Wrapper that accepts optional path from LandingView signal
+		path = args[0] if args else None
+		self.load_image(path)
+
+	def update_toolbar_state(self, editor_active: bool) -> None:
+		# Mostrar/activar acciones y atajos solo cuando el editor está activo
+		try:
+			self.toolbar.setVisible(editor_active)
+		except Exception:
+			pass
+		for a in (self.reset_action, self.save_action, self.rotate_right_action, self.rotate_left_action, self.rotate_180_action):
+			a.setVisible(editor_active)
+			a.setEnabled(editor_active)
+		for s in (self.shortcut_return, self.shortcut_enter, self.shortcut_alt1, self.shortcut_alt2):
+			s.setEnabled(editor_active)
 
 	def save_points(self, path: str | None = None) -> None:
 		"""Guardar puntos automáticamente en `CVFilesOutput` sin pedir nombre de archivo.
@@ -136,6 +180,8 @@ class MainWindow(QtWidgets.QMainWindow):
 				pass
 			self.current_image_path = None
 			QtWidgets.QMessageBox.information(self, "Aviso", "Imagen guardada exitosamente")
+			# Volver a la LandingView
+			self.stack.setCurrentIndex(0)
 		
 		if not ok:
 			QtWidgets.QMessageBox.warning(self, 'Error', f'No se pudo guardar la imagen en: {out_fname}')
