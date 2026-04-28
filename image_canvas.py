@@ -206,7 +206,7 @@ class ImageCanvas(QtWidgets.QWidget):
         """
         key = event.key()
         # Toggle magnifier
-        if key == QtCore.Qt.Key.Key_L:
+        if key == QtCore.Qt.Key.Key_A:
             self._magnifier_enabled = not self._magnifier_enabled
             self.update()
             return
