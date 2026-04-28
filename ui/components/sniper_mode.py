@@ -46,6 +46,7 @@ class SniperModeManager:
                     QtGui.QCursor.setPos(center_global)
                 except Exception:
                     logger.warning("Fallo al intentar centrar el mouse en el modo sniper",exc_info=True)
+
                 self.active = True
                 mouse_wx = int(round(self.virtual_cursor_pos.x()))
                 mouse_wy = int(round(self.virtual_cursor_pos.y()))
@@ -63,7 +64,7 @@ class SniperModeManager:
                         vpy = int(round(self.virtual_cursor_pos.y()))
                         global_pos = widget.mapToGlobal(QtCore.QPoint(vpx, vpy))
                         QtGui.QCursor.setPos(global_pos)
-                    except Exception as e:
+                    except Exception:
                         logger.error("Fallo al restaurar el cursor al centro",exc_info=True)
                     try:
                         if self.saved_cursor is not None:
