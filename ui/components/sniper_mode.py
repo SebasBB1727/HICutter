@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Optional, Tuple
 
 from PyQt6 import QtCore, QtGui
+from utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class SniperModeManager:
     """Manage a virtual cursor for precision/snipe mode.
@@ -37,15 +39,14 @@ class SniperModeManager:
                 try:
                     widget.setCursor(QtCore.Qt.CursorShape.BlankCursor)
                 except Exception:
-                    # TODO: Implement logging
-                    pass
+                    logger.warning("Fallo al ocultar el mouse entrando en el modo sniper", exc_info=True)
                 # lock physical cursor to center to allow infinite relative motion
                 center_global = widget.mapToGlobal(widget.rect().center())
                 try:
                     QtGui.QCursor.setPos(center_global)
                 except Exception:
-                    # TODO: Implement logging
-                    pass
+                    logger.warning("Fallo al intentar centrar el mouse en el modo sniper",exc_info=True)
+
                 self.active = True
                 mouse_wx = int(round(self.virtual_cursor_pos.x()))
                 mouse_wy = int(round(self.virtual_cursor_pos.y()))
@@ -64,17 +65,17 @@ class SniperModeManager:
                         global_pos = widget.mapToGlobal(QtCore.QPoint(vpx, vpy))
                         QtGui.QCursor.setPos(global_pos)
                     except Exception:
-                        pass
+                        logger.error("Fallo al restaurar el cursor al centro",exc_info=True)
                     try:
                         if self.saved_cursor is not None:
                             widget.setCursor(self.saved_cursor)
                         else:
                             widget.unsetCursor()
                     except Exception:
-                        pass
+                        logger.error("Fallo al restaurar el color del cursor",exc_info=True)
                     return True
         except Exception:
-            pass
+            logger.error("Fallo al registrar el evento",exc_info=True)
         return False
 
     def handle_mouse_move(self, event: QtGui.QMouseEvent, widget: QtGui.QWidget) -> Tuple[bool, Optional[int], Optional[int], Optional[bool]]:
@@ -141,11 +142,11 @@ class SniperModeManager:
             global_pos = widget.mapToGlobal(QtCore.QPoint(vpx, vpy))
             QtGui.QCursor.setPos(global_pos)
         except Exception:
-            pass
+            logger.error("Fallo al restaurar posición en deactivate()", exc_info=True)
         try:
             if self.saved_cursor is not None:
                 widget.setCursor(self.saved_cursor)
             else:
                 widget.unsetCursor()
         except Exception:
-            pass
+            logger.error("Fallo al restaurar icono del cursor en deactivate()", exc_info=True)

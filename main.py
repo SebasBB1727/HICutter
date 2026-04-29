@@ -5,7 +5,9 @@ from core.processor import process_perspective_crop, rotate_image
 
 from image_canvas import ImageCanvas
 from ui.views.landing_view import LandingView
+from utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 class MainWindow(QtWidgets.QMainWindow):
 	def __init__(self) -> None:
@@ -77,7 +79,8 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.landing.requestLoadImage.connect(self._handle_request_load_image)
 		except Exception:
 			# Si LandingView no tiene la señal, seguir sin error
-			pass
+			logger.error("No se conecto LandingView",exc_info=True)
+
 
 		# Actualizar estado del toolbar cuando cambia la vista
 		self.stack.currentChanged.connect(lambda idx: self.update_toolbar_state(idx == 1))
@@ -133,7 +136,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		try:
 			self.toolbar.setVisible(editor_active)
 		except Exception:
-			pass
+			logger.warning("La toolbar no cargo correctamente", exc_info=True)
+
 		for a in (self.reset_action, self.save_action, self.rotate_right_action, self.rotate_left_action, self.rotate_180_action):
 			a.setVisible(editor_active)
 			a.setEnabled(editor_active)
@@ -185,7 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			try:
 				self.canvas.unload_image()
 			except Exception:
-				pass
+				logger.error("Error al procesar el canvas correctamente", exc_info=True)
 			self.current_image_path = None
 			QtWidgets.QMessageBox.information(self, "Aviso", "Imagen guardada exitosamente")
 			# Volver a la LandingView

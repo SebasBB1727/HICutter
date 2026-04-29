@@ -5,7 +5,9 @@ from typing import Optional
 import cv2
 import numpy as np
 from PyQt6 import QtGui
+from utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 def _cv_to_qpixmap(img: np.ndarray) -> QtGui.QPixmap:
     """Convert an OpenCV image (numpy array, BGR or grayscale) to QPixmap.
@@ -42,5 +44,6 @@ def _cv_to_qpixmap(img: np.ndarray) -> QtGui.QPixmap:
         bytes_per_line = 3 * w
         qimg = QtGui.QImage(rgb.tobytes(), w, h, bytes_per_line, QtGui.QImage.Format.Format_RGB888)
         return QtGui.QPixmap.fromImage(qimg)
-    except Exception:
-        raise ValueError("Unsupported image shape for conversion to QPixmap")
+    except Exception as e:
+        logger.error("Forma no soposrtada para converion a QPixmap", exc_info=True)
+        raise ValueError("Unsupported image shape for conversion to QPixmap") from e
