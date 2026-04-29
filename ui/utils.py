@@ -6,7 +6,6 @@ import cv2
 import numpy as np
 from PyQt6 import QtGui
 
-
 def _cv_to_qpixmap(img: np.ndarray) -> QtGui.QPixmap:
     """Convert an OpenCV image (numpy array, BGR or grayscale) to QPixmap.
 
