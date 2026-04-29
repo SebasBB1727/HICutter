@@ -189,7 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			try:
 				self.canvas.unload_image()
 			except Exception:
-				logger.error("Error al procesar el canvas correctamente")
+				logger.error("Error al procesar el canvas correctamente", exc_info=True)
 			self.current_image_path = None
 			QtWidgets.QMessageBox.information(self, "Aviso", "Imagen guardada exitosamente")
 			# Volver a la LandingView
