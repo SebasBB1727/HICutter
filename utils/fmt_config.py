@@ -22,7 +22,7 @@ class UserConfigManager:
             "format": "jpg",
             "quality": 60,
             "dpi": 72,
-            "longest_edge": 500
+            "shortest_edge": 500
         },
         "paths":{
             "output_dir": "output"
