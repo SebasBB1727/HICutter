@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from PyQt6 import QtGui, QtCore
-from ui.utils import _cv_to_qpixmap
+from utils.utils import _cv_to_qpixmap
 
 
 class MagnifierTool:

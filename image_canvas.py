@@ -9,7 +9,7 @@ from ui.components.geometry import ScaledPixmapManager
 from ui.components.point_manager import PointManager
 from ui.components.magnifier import MagnifierTool
 from ui.components.sniper_mode import SniperModeManager
-from ui.utils import _cv_to_qpixmap
+from utils.utils import _cv_to_qpixmap
 
 
 class ImageCanvas(QtWidgets.QWidget):
