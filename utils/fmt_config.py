@@ -8,7 +8,7 @@ logger = setup_logger(__name__)
 
 class UserConfigManager:
     #Creamos el nombre del archivo
-    CONFIG_FILE = "fmt_setings.json"
+    CONFIG_FILE = "fmt_settings.json"
 
     #Creamos una configuracion default por si el usuario no los configura
     DEFAULT_CONFIG = {
@@ -16,17 +16,20 @@ class UserConfigManager:
             "format": "jpg",
             "quality": 80,
             "dpi": 96,
-            "longest_edge": 3000
+            "longest_edge": 3000,
+            "output_dir": "RD"
         },
         "export_th":{
             "format": "jpg",
             "quality": 60,
             "dpi": 72,
-            "shortest_edge": 500
+            "shortest_edge": 500,
+            "output_dir": "TH"
         },
         "paths":{
-            "output_dir": "output"
+            "base_output_dir": ""
         }
+       
     }
 
     def __init__(self) -> None:

@@ -6,6 +6,8 @@ from core.processor import process_perspective_crop, rotate_image
 from image_canvas import ImageCanvas
 from ui.views.landing_view import LandingView
 from utils.logger import setup_logger
+from core.output_fmt import export_rd, export_th
+from utils.fmt_config import config_manager
 
 logger = setup_logger(__name__)
 
@@ -145,9 +147,9 @@ class MainWindow(QtWidgets.QMainWindow):
 			s.setEnabled(editor_active)
 
 	def save_points(self, path: str | None = None) -> None:
-		"""Guardar puntos automáticamente en `CVFilesOutput` sin pedir nombre de archivo.
-		Si `path` se proporciona, se usará esa ruta en su lugar.
-		"""
+		"""Guarda la imagen procesada preguntando primero el destino.
+					(Procesamiento de una sola imagen)"""
+		
 		pts = self.canvas.get_points()
 		if pts.shape[0] != 4:
 			QtWidgets.QMessageBox.warning(self, 'Aviso', 'Faltan puntos (se requieren 4)')
@@ -169,35 +171,42 @@ class MainWindow(QtWidgets.QMainWindow):
 			QtWidgets.QMessageBox.warning(self, 'Error', str(e) if str(e) else 'Dimensiones inválidas para el recorte')
 			return
 
-		# guardar resultado en carpeta `output`
-		os.makedirs('output', exist_ok=True)
-		if path:
-			out_fname = path
-		else:
-			# usar el nombre original si está disponible, sino usar timestamp
-			base_name = None
-			if getattr(self, 'current_image_path', None):
-				base_name = os.path.basename(self.current_image_path)
-			if base_name:
-				out_fname = os.path.join('output', base_name)
-			else:
-				out_fname = os.path.join('output', f'crop_{time.strftime("%Y%m%d_%H%M%S")}.png')
-
-		ok = cv2.imwrite(out_fname, warped)
-		# Si el guardado fue correcto, descargar la imagen y limpiar la referencia
-		if ok:
-			try:
-				self.canvas.unload_image()
-			except Exception:
-				logger.error("Error al procesar el canvas correctamente", exc_info=True)
-			self.current_image_path = None
-			QtWidgets.QMessageBox.information(self, "Aviso", "Imagen guardada exitosamente")
-			# Volver a la LandingView
-			self.stack.setCurrentIndex(0)
+		'''Incluimos metodo de guardado a travez de "core/output_fmt.py"'''
+		#Leemos la ultima linea de directorio para comodidad del usuario 
+		last_dir = config_manager.get("paths", "base_output_dir") or os.path.expanduser("~")
 		
-		if not ok:
-			QtWidgets.QMessageBox.warning(self, 'Error', f'No se pudo guardar la imagen en: {out_fname}')
+		folder_path = QtWidgets.QFileDialog.getExistingDirectory(self, "Seleccionar carpeta para guardar recortes (RD y TH)", last_dir)
+
+		#por si el usuario presiona "cancelar"
+		if not folder_path:
 			return
+		
+		# Guardamos el folder seleccionado por el usuario
+		config_manager.set("paths", "base_output_dir", folder_path)
+
+		# Obtenemos el nombre del archivo
+		base_name = "crop_temp.jpg"
+		if getattr(self,"current_image_path", None):
+			base_name = os.path.basename(self.current_image_path)
+		
+		# Delegamos la exportacion a core/output_fmt.py
+		try:
+			export_rd(warped, base_name)
+			export_th(warped, base_name)
+
+		except Exception as e:
+			logger.error("Error al Exportar formatos RD o TH", exc_info=True)
+			QtWidgets.QMessageBox.warning(self, "Error", "No se pudo exportar la imagen (revise logs)")
+		
+		try:
+			self.canvas.unload_image()
+			self.current_image_path = None
+			QtWidgets.QMessageBox.information(self, "Aviso", f"Imagen guardada exitosamente en: \n{folder_path}")
+			self.stack.setCurrentIndex(0)
+		except Exception as e:
+			logger.error("Error al regresar a la pagina de inicio", exc_info=True)
+			QtWidgets.QMessageBox.warning(self, "Error", "No se pudo cargar la pagina de inicio, reinicie la aplicacion")
+		
 
 
 def main() -> None:
