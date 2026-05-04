@@ -3,11 +3,11 @@
 This module contains the image processing logic separated from the UI.
 """
 
-from typing import Any
-
 import numpy as np
 import cv2
+from utils.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 def process_perspective_crop(cv_image: np.ndarray, points: np.ndarray) -> np.ndarray:
     """Compute perspective transform from 4 points and return the warped image.
@@ -53,10 +53,21 @@ def process_perspective_crop(cv_image: np.ndarray, points: np.ndarray) -> np.nda
     return warped
 
 
-def rotate_image(cv_image: np.ndarray, code: int) -> np.ndarray:
+def rotate_image(cv_image: np.ndarray, direction_rotate: int) -> np.ndarray:
     """Return a rotated copy of `cv_image` using OpenCV rotate codes.
 
     This is a pure function placed in the core so UI components do not
     perform image transformations directly.
     """
+    try:
+        match direction_rotate:
+            case "derecha":
+                code = cv2.ROTATE_90_CLOCKWISE
+            case "izquierda":
+                code = cv2.ROTATE_90_COUNTERCLOCKWISE
+            case "180":
+                code = cv2.ROTATE_180
+    except Exception:
+        logger.error("Fallo al intentar realizar la rotacion", exc_info=True)
+
     return cv2.rotate(cv_image, code)

@@ -22,6 +22,7 @@ class SniperModeManager:
         self.virtual_cursor_pos: QtCore.QPointF = QtCore.QPointF()
         self.saved_cursor: Optional[QtGui.QCursor] = None
         self.sensitivity: float = float(sensitivity)
+        self._last_physical_pos = QtCore.QPoint()
 
     def handle_key_press(self, event: QtGui.QKeyEvent, widget: QtGui.QWidget) -> tuple[bool, Optional[int], Optional[int]]:
         """Handle key press to enter sniper/precision mode.
@@ -36,17 +37,13 @@ class SniperModeManager:
                 wpos = widget.mapFromGlobal(gpos)
                 self.virtual_cursor_pos = QtCore.QPointF(float(wpos.x()), float(wpos.y()))
                 self.saved_cursor = widget.cursor()
+                self._last_physical_pos = gpos #<- Guardamos la posicion fisica inicial en lugar de recentrar
+
                 try:
                     widget.setCursor(QtCore.Qt.CursorShape.BlankCursor)
                 except Exception:
                     logger.warning("Fallo al ocultar el mouse entrando en el modo sniper", exc_info=True)
-                # lock physical cursor to center to allow infinite relative motion
-                center_global = widget.mapToGlobal(widget.rect().center())
-                try:
-                    QtGui.QCursor.setPos(center_global)
-                except Exception:
-                    logger.warning("Fallo al intentar centrar el mouse en el modo sniper",exc_info=True)
-
+                
                 self.active = True
                 mouse_wx = int(round(self.virtual_cursor_pos.x()))
                 mouse_wy = int(round(self.virtual_cursor_pos.y()))
@@ -79,24 +76,31 @@ class SniperModeManager:
         return False
 
     def handle_mouse_move(self, event: QtGui.QMouseEvent, widget: QtGui.QWidget) -> Tuple[bool, Optional[int], Optional[int], Optional[bool]]:
-        """Process mouse movement when sniper is active.
-
-        Returns (handled, mouse_wx, mouse_wy, mouse_in_img).
+        """Procesa el movimiento del raton cuando esta activo el modo sniper.
+        Retorna: (handled, mouse_wx, mouse_wy, mouse_in_img).
         """
         if not self.active:
             return False, None, None, None
 
-        posf = event.position()
-        center = QtCore.QPointF(widget.rect().center())
-        dx = posf.x() - center.x()
-        dy = posf.y() - center.y()
+        #Calculamos cuanto se movio el mouse fisico desde la ultima vez
+        current_physical_pos = QtGui.QCursor.pos()
+        gposf = event.globalPosition()
+
+        dx = gposf.x() - self._last_physical_pos.x()
+        dy = gposf.y() - self._last_physical_pos.y()
+
         # evitar procesar cuando no hay movimiento físico
         if dx == 0 and dy == 0:
             return True, int(round(self.virtual_cursor_pos.x())), int(round(self.virtual_cursor_pos.y())), False
 
+        #Actualizamos la ultima posicion fisica
+        self._last_physical_pos = current_physical_pos
+
+        #Aplicamos la sensibilidad al movimiento
         dx *= self.sensitivity
         dy *= self.sensitivity
 
+        #Sumamos al acumulador virtual
         self.virtual_cursor_pos.setX(self.virtual_cursor_pos.x() + dx)
         self.virtual_cursor_pos.setY(self.virtual_cursor_pos.y() + dy)
 
@@ -107,12 +111,6 @@ class SniperModeManager:
 
         mouse_wx = int(round(self.virtual_cursor_pos.x()))
         mouse_wy = int(round(self.virtual_cursor_pos.y()))
-
-        # recentre el cursor físico al centro para permitir movimiento infinito
-        try:
-            QtGui.QCursor.setPos(widget.mapToGlobal(widget.rect().center()))
-        except Exception:
-            pass
 
         img_pt = widget.widget_to_image_coords(mouse_wx, mouse_wy)
         mouse_in_img = (img_pt is not None and len(widget._point_manager) < 4)
