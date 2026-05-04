@@ -23,8 +23,6 @@ class ImageCanvas(QtWidgets.QWidget):
       el último punto. Doble click con el botón izquierdo reinicia la selección.
     """
     fourPointsSelected = QtCore.pyqtSignal(object)
-    requestLoadImage = QtCore.pyqtSignal()
-    requestLoadBatch = QtCore.pyqtSignal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -45,15 +43,12 @@ class ImageCanvas(QtWidgets.QWidget):
         self.cross_len: int = 8
         self._cross_cursor = self._create_cross_cursor(self.cross_len)
         # Caché del pixmap escalado está gestionada por `ScaledPixmapManager`
-        # Lupa de enfoque (inicialmente desactivada; toggle con tecla 'l')
+        # Lupa de enfoque (inicialmente desactivada; toggle con tecla 'A')
         self._magnifier_enabled: bool = False
         self._magnifier = MagnifierTool()
         # Modo sniper/precisión
         self._sniper = SniperModeManager()
 
-        # Shortcut para alternar la lupa con la tecla 'A' (funciona aunque el widget no tenga foco)
-        shortcut_l = QtGui.QShortcut(QtGui.QKeySequence('A'), self)
-        shortcut_l.activated.connect(lambda: self._toggle_magnifier())
 
     def _toggle_magnifier(self) -> None:
         self._magnifier_enabled = not self._magnifier_enabled
@@ -61,27 +56,20 @@ class ImageCanvas(QtWidgets.QWidget):
 
     # ---------- Carga y conversión
     def load_image(self, path: Optional[str] = None, cv_image: Optional[np.ndarray] = None) -> None:
-        """Carga una imagen desde `path` o desde un array OpenCV `cv_image` (BGR).
-        Invoca update() para repintar el widget.
+        """Recibe una matriz de OpenCV (BGR) y la prepara para renderizado visual.
+        El Canvas no lee archivos locales, solo procesa datos en memoria.
         """
-        if path is None and cv_image is None:
-            raise ValueError("Se requiere `path` o `cv_image`")
-
-        if path is not None:
-            img = cv2.imread(path)
-            if img is None:
-                raise IOError(f"No se pudo leer la imagen: {path}")
-            self.cv_image = img
-        else:
-            # copiar para evitar aliasing accidental
-            self.cv_image = cv_image.copy()
-
+        if cv_image is None:
+            raise ValueError("Se recibio un cv_image vacio o nulo")
+        # Copiamos la matriz para evitar que modificaciones externas dañen la vista
+        self.cv_image = cv_image.copy()
+        # Delegamos la conversión de colores BGR a RGB y a formato Qt
         self._pixmap = _cv_to_qpixmap(self.cv_image)
         # actualizar la referencia del manager
         self._scaled_manager.set_pixmap(self._pixmap)
         # actualizar caché escalado
         self._update_scaled_pixmap_cache()
-        # reset points
+        # Reiniciamos las herramientas de dibujo
         self._point_manager.reset()
         self.update()
 
@@ -171,12 +159,21 @@ class ImageCanvas(QtWidgets.QWidget):
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
-        """Handle Shift release to exit precision/sniper mode and restore cursor."""
-        key = event.key()
+        """Maneja la liberación de Shift para salir del modo precisión.
+        Evita el glitch del ratón teletransportando el cursor del SO a la posición virtual.
+        """
         handled = self._sniper.handle_key_release(event, self)
         if handled:
+            # Obtenemos la última coordenada (x, y) de tu cursor lento (Sniper)
+            wfx, wfy = self._sniper.get_current_widget_pos(None, self)
+            # Convertimos esa coordenada interna de la app a coordenadas absolutas del monitor
+            global_pos = self.mapToGlobal(QtCore.QPoint(int(wfx), int(wfy)))
+            # Obligamos al mouse físico de Windows a moverse a esa coordenada
+            QtGui.QCursor.setPos(global_pos)
+
             self.update()
             return
+
         super().keyReleaseEvent(event)
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
