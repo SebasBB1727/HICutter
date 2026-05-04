@@ -73,7 +73,6 @@ class ImageCanvas(QtWidgets.QWidget):
         self._point_manager.reset()
         self.update()
 
-    # Image conversion moved to `ui.utils._cv_to_qpixmap`
 
     def _create_cross_cursor(self, cross_len: int) -> QtGui.QCursor:
         """Crea un QCursor con una cruceta roja centrada."""
