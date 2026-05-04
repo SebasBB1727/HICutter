@@ -37,6 +37,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.toolbar.sig_rotate_right_requested.connect(lambda: self._apply_rotation("derecha"))
 		self.toolbar.sig_rotate_left_requested.connect(lambda: self._apply_rotation("izquierda"))
 		self.toolbar.sig_rotate_180_requested.connect(lambda: self._apply_rotation("180"))
+		self.toolbar.sig_cancel_requested.connect(self.cancel_operation)
 
 		# Atajos globales
 		self.shortcut_return = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
@@ -177,7 +178,36 @@ class MainWindow(QtWidgets.QMainWindow):
 		except Exception as e:
 			logger.error("Error al regresar a la pagina de inicio", exc_info=True)
 			QtWidgets.QMessageBox.warning(self, "Error", "No se pudo cargar la pagina de inicio, reinicie la aplicacion")
-		
+	
+	def cancel_operation (self) -> None:
+		'''Aborto seguro del procesamiento
+		Confirma la operacion de aborto al usuario'''
+
+		answer = QtWidgets.QMessageBox.question(
+			self,
+			"Confirmar cancelacion",
+			"¿Estas seguro de cancelar el proceso actual y regresar a la pagina de inicio?\n" \
+			"Nota: En procesamiento por lote, esta accion solo afecta a la imagen actual.\n" \
+			"Las imagenes previas no se veran afectadas.",
+			QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No, 
+			QtWidgets.QMessageBox.StandardButton.No #<- Eleccion por defecto en caso de que se presione "enter"
+		)
+		if answer == QtWidgets.QMessageBox.StandardButton.No:
+			return
+		#Ejecutamos el codigo para limpiar el lienzo de forma correcta
+		try:
+			# Borramos la imagen de la memoria del Canvas
+			self.canvas.unload_image()
+			# Destruimos la referencia a la ruta original
+			self.current_image_path = None
+			# Cambiamos la vista a la pantalla Landing (índice 0)
+			self.stack.setCurrentIndex(0)
+
+			logger.info("Proceso cancelado por el usuario y redirijido a la paginia principal correctamente")
+		except Exception:
+			logger.error("Error al critico al intentar cancelar la operacion", exc_info=True)
+			QtWidgets.QMessageBox.warning(self, "Error", "Error al limpiar la memoria, intente nuevamente")
+
 
 
 def main() -> None:
