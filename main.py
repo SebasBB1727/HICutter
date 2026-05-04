@@ -1,6 +1,8 @@
 from PyQt6 import QtWidgets, QtGui, QtCore
 import sys
 import cv2
+import numpy as np
+import os
 from core.processor import process_perspective_crop, rotate_image
 
 from image_canvas import ImageCanvas
@@ -8,6 +10,7 @@ from ui.views.landing_view import LandingView
 from utils.logger import setup_logger
 from core.output_fmt import export_rd, export_th
 from utils.fmt_config import config_manager
+from ui.components.editor_toolbar import EditorToolbar
 
 logger = setup_logger(__name__)
 
@@ -25,55 +28,22 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setCentralWidget(self.stack)
 		self.current_image_path: str | None = None
 
-		# Toolbar
-		self.toolbar = self.addToolBar('main')
-		# Aplicar estilo consistente a los botones del toolbar (borde #252525)
-		self.toolbar.setStyleSheet("""
-		QToolButton {
-			border: 1px solid #0E3468;
-			background: transparent;
-			padding: 4px 8px;
-			border-radius: 4px;
-		}
-		QToolButton:hover {
-			background: rgba(37,37,37,0.06);
-		}
-		""")
+		# Toolbar implementado desde "editor_toolbar.py"
+		self.toolbar = EditorToolbar(self)
+		self.addToolBar(self.toolbar)
+		
+		#Conectamos las "señales" enviadas desde "editor_toolbar.py"
+		self.toolbar.sig_reset_requested.connect(self.canvas.reset_points)
+		self.toolbar.sig_rotate_right_requested.connect(lambda: self._apply_rotation("derecha"))
+		self.toolbar.sig_rotate_left_requested.connect(lambda: self._apply_rotation("izquierda"))
+		self.toolbar.sig_rotate_180_requested.connect(lambda: self._apply_rotation("180"))
 
-		# Actions (kept as attributes to toggle visibility/state)
-		self.reset_action = QtGui.QAction('Reiniciar puntos', self)
-		self.reset_action.triggered.connect(self.canvas.reset_points)
-		self.toolbar.addAction(self.reset_action)
-
-		self.save_action = QtGui.QAction('Guardar puntos', self)
-		self.save_action.triggered.connect(self.save_points)
-		self.toolbar.addAction(self.save_action)
-
-		self.canvas.fourPointsSelected.connect(self.on_four_points)
-
-		# Botones de rotación (90° derecha, 90° izquierda, 180°)
-		self.rotate_right_action = QtGui.QAction('Rotar 90° →', self)
-		self.rotate_right_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_90_CLOCKWISE))
-		self.toolbar.addAction(self.rotate_right_action)
-
-		self.rotate_left_action = QtGui.QAction('Rotar 90° ←', self)
-		self.rotate_left_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_90_COUNTERCLOCKWISE))
-		self.toolbar.addAction(self.rotate_left_action)
-
-		self.rotate_180_action = QtGui.QAction('Rotar 180°', self)
-		self.rotate_180_action.triggered.connect(lambda: self._apply_rotation(cv2.ROTATE_180))
-		self.toolbar.addAction(self.rotate_180_action)
-
-		# Atajo Enter: guarda puntos si ya se tienen 4
+		# Atajos globales
 		self.shortcut_return = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Return), self)
 		self.shortcut_return.activated.connect(self._on_enter_key)
 		self.shortcut_enter = QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key.Key_Enter), self)
 		self.shortcut_enter.activated.connect(self._on_enter_key)
-
-		# Atajos Alt+1 (rotar 90° derecha) y Alt+2 (guardar puntos cuando hay 4)
-		self.shortcut_alt1 = QtGui.QShortcut(QtGui.QKeySequence('Alt+1'), self)
-		self.shortcut_alt1.activated.connect(lambda: self._apply_rotation(cv2.ROTATE_90_CLOCKWISE))
-		self.shortcut_alt2 = QtGui.QShortcut(QtGui.QKeySequence('Alt+2'), self)
+		self.shortcut_alt2 = QtGui.QShortcut(QtGui.QKeySequence("alt+2"), self)
 		self.shortcut_alt2.activated.connect(self._on_enter_key)
 
 		# Conectar la señal de la LandingView para abrir imagen
@@ -125,28 +95,32 @@ class MainWindow(QtWidgets.QMainWindow):
 		path = args[0] if args else None
 		self.load_image(path)
 
-	def _apply_rotation(self, code: int) -> None:
-		"""Apply rotation (via core.rotate_image) and reload into the canvas."""
+	def _apply_rotation(self, direction_rotate: str) -> None:
+		"""Se aplica la rotacion (via processor.rotate_image) y recarga la imagen via canvas"""
 		if self.canvas.cv_image is None:
 			return
-		rotated = rotate_image(self.canvas.cv_image, code)
+		rotated = rotate_image(self.canvas.cv_image, direction_rotate)
 		# reload the rotated image into the canvas
 		self.canvas.load_image(cv_image=rotated)
 
 	def update_toolbar_state(self, editor_active: bool) -> None:
-		# Mostrar/activar acciones y atajos solo cuando el editor está activo
+		'''Activa/desactiva las heramientas si hay o no imagen cargada'''
 		try:
-			self.toolbar.setVisible(editor_active)
+			#Apagamos o encendemos la toolbar
+			self.toolbar.set_editor_active(editor_active)
 		except Exception:
-			logger.warning("La toolbar no cargo correctamente", exc_info=True)
+			logger.error("Error al activar/desactivar la toolbar", exc_info=True)
+		
+		try:
+			#Apagamos o encendemos los shortcuts
+			self.shortcut_enter.setEnabled(editor_active)
+			self.shortcut_return.setEnabled(editor_active)
+			self.shortcut_alt2.setEnabled(editor_active)
+		except Exception:
+			logger.warning("LA funcionalidad de 'Shortcuts' no fue activada/ desactivada correctamente", exc_info=True)
 
-		for a in (self.reset_action, self.save_action, self.rotate_right_action, self.rotate_left_action, self.rotate_180_action):
-			a.setVisible(editor_active)
-			a.setEnabled(editor_active)
-		for s in (self.shortcut_return, self.shortcut_enter, self.shortcut_alt1, self.shortcut_alt2):
-			s.setEnabled(editor_active)
 
-	def save_points(self, path: str | None = None) -> None:
+	def save_points(self) -> None:
 		"""Guarda la imagen procesada preguntando primero el destino.
 					(Procesamiento de una sola imagen)"""
 		
@@ -154,9 +128,6 @@ class MainWindow(QtWidgets.QMainWindow):
 		if pts.shape[0] != 4:
 			QtWidgets.QMessageBox.warning(self, 'Aviso', 'Faltan puntos (se requieren 4)')
 			return
-		import numpy as np
-		import os
-		import time
 
 		if self.canvas.cv_image is None:
 			QtWidgets.QMessageBox.warning(self, 'Error', 'No hay imagen cargada')
