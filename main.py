@@ -51,9 +51,13 @@ class MainWindow(QtWidgets.QMainWindow):
 		try:
 			self.landing.requestLoadImage.connect(self._handle_request_load_image)
 		except Exception:
-			# Si LandingView no tiene la señal, seguir sin error
-			logger.error("No se conecto LandingView",exc_info=True)
+			logger.error("No se conecto el procesamiento de imagen individual",exc_info=True)
 
+		# Conectar la señal de la configuracion del procesamiento por lotes
+		try:
+			self.landing.requestLoadBatch.connect(self._start_batch_workflow)
+		except Exception:
+			logger.error("No se conecto batch_setup_dialog", exc_info=True)
 
 		# Actualizar estado del toolbar cuando cambia la vista
 		self.stack.currentChanged.connect(lambda idx: self.update_toolbar_state(idx == 1))
@@ -95,6 +99,13 @@ class MainWindow(QtWidgets.QMainWindow):
 		# Wrapper that accepts optional path from LandingView signal
 		path = args[0] if args else None
 		self.load_image(path)
+
+	def _start_batch_workflow(self):
+		from ui.views.batch_setup_dialog import BatchSetupDialog
+		dialog = BatchSetupDialog(self)
+		if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+			carpeta_entrada, carpeta_salida = dialog.get_directories()
+			print(f"Lote iniciado: carpeta a procesar: {carpeta_entrada}\nCarpeta salida: {carpeta_salida}")
 
 	def _apply_rotation(self, direction_rotate: str) -> None:
 		"""Se aplica la rotacion (via processor.rotate_image) y recarga la imagen via canvas"""
