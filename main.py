@@ -135,7 +135,7 @@ class MainWindow(QtWidgets.QMainWindow):
 			self.shortcut_return.setEnabled(editor_active)
 			self.shortcut_alt2.setEnabled(editor_active)
 		except Exception:
-			logger.warning("LA funcionalidad de 'Shortcuts' no fue activada/ desactivada correctamente", exc_info=True)
+			logger.warning("LA funcionalidad de 'Shortcuts' no fue activada/desactivada correctamente", exc_info=True)
 
 	def _start_batch_workflow(self):
 		from ui.views.batch_setup_dialog import BatchSetupDialog
@@ -164,7 +164,7 @@ class MainWindow(QtWidgets.QMainWindow):
 				self.current_image_path = next_path
 				#Le pasamos la info al HUD
 				nombre_archivo = os.path.basename(next_path)
-				progreso = f"[{self.batch_manager.current_index}/{len(self.batch_manager.image_files)}]"
+				progreso = f"{self.batch_manager.current_index}/{len(self.batch_manager.image_files)}"
 				self.canvas.set_hud_info(nombre_archivo, progreso)
 				self.canvas.load_image(cv_image=img)
 				self.stack.setCurrentIndex(1)

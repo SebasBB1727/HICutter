@@ -396,10 +396,16 @@ class ImageCanvas(QtWidgets.QWidget):
         
         #informacion del HUD
         if self.hud_filename:
-            # Fondo semi-transparente
-            painter.setPen(QtCore.Qt.PenStyle.NoPen)
-            painter.setBrush(QtGui.QColor(79, 79, 79, 160)) # Negro con 60% opacidad
-            painter.drawRoundedRect(15, 15, 300, 85, 5, 5) # (x, y, width, height, radius_x, radius_y)
+            # Fondo semi-transparente con borde
+            hud_border_color = QtGui.QColor(self.cross_color)
+            hud_border_color.setAlpha(130)
+            hud_border_width = 2
+            pen_hud = QtGui.QPen(hud_border_color)
+            pen_hud.setWidth(hud_border_width)
+            pen_hud.setJoinStyle(QtCore.Qt.PenJoinStyle.MiterJoin)
+            painter.setPen(pen_hud)
+            painter.setBrush(QtGui.QColor(55, 55, 55, 130))
+            painter.drawRoundedRect(15, 15, 290, 85, 12, 12) # (x, y, width, height, radius_x, radius_y)
             
             # Textos en blanco
             painter.setPen(QtGui.QColor(255, 255, 255))
@@ -408,12 +414,12 @@ class ImageCanvas(QtWidgets.QWidget):
             font.setBold(True)
             painter.setFont(font)
             
-            painter.drawText(25, 35, f"Archivo: {self.hud_filename}")
+            painter.drawText(25, 35, f"{self.hud_filename}")
             
             font.setBold(False)
             painter.setFont(font)
-            painter.drawText(25, 60, f"Progreso: {self.hud_progress}")
-            painter.drawText(25, 85, f"Color: {self.hud_colorspace}")
+            painter.drawText(25, 60, f"{self.hud_colorspace}")
+            painter.drawText(25, 85, f"Progreso: {self.hud_progress}")
 
         painter.end()
 
