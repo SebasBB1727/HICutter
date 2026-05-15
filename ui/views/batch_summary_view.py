@@ -69,6 +69,8 @@ class BatchSummaryView(QtWidgets.QWidget):
         self.lbl_preview_img = QtWidgets.QLabel()
         self.lbl_preview_img.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.lbl_preview_img.setStyleSheet("background-color: #1E1E1E; border-radius: 5px;")
+        self.lbl_preview_img.setMinimumSize(100, 100)
+        self.lbl_preview_img.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         self.lbl_preview_img.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
         
         preview_layout.addWidget(self.lbl_preview_title)

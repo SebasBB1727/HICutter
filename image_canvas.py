@@ -27,6 +27,7 @@ class ImageCanvas(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.setMinimumSize(320, 240)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Policy.Ignored, QtWidgets.QSizePolicy.Policy.Ignored)
 
         self.cv_image: Optional[np.ndarray] = None
         self._pixmap: Optional[QtGui.QPixmap] = None
