@@ -57,6 +57,7 @@ class ImageCanvas(QtWidgets.QWidget):
         self.cross_color = QtGui.QColor(12, 140, 233)
         self.line_color = QtGui.QColor(0, 0, 0)
         self.cross_width: int = 2
+        self.border_color = QtGui.QColor(190, 190, 190)
 
         # valores para la Lupa de enfoque 
         MAG_SIZE = 250
@@ -410,6 +411,7 @@ class ImageCanvas(QtWidgets.QWidget):
                     cross_len=self.cross_len*2,
                     cross_color=self.cross_color,
                     cross_width=self.cross_width,
+                    border_color=self.border_color
                     )
         
         #informacion del HUD

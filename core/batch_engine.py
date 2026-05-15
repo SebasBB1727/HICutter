@@ -17,17 +17,18 @@ class WorkerSignals(QtCore.QObject):
     finished = QtCore.pyqtSignal(str)          # Devuelve la ruta donde se guardó
     error = QtCore.pyqtSignal(str, str)        # Devuelve (nombre_archivo, mensaje_error)
 
-# EL OBRERO (Se ejecuta en 2do Plano)
+# EL OBRERO (Se ejecutara en 2do Plano)
 class BatchWorker(QtCore.QRunnable):
     """
     Hilo trabajador que recorta y exporta la imagen en segundo plano.
     No toca la interfaz gráfica (GUI) en absoluto.
     """
-    def __init__(self, cv_image: np.ndarray, points: np.ndarray, file_name: str):
+    def __init__(self, cv_image: np.ndarray, points: np.ndarray, file_name: str, parent_folder_name: str = ""):
         super().__init__()
         self.cv_image = cv_image
         self.points = points
         self.file_name = file_name
+        self.parent_folder_name = parent_folder_name
         self.signals = WorkerSignals()
 
     @QtCore.pyqtSlot()
@@ -39,8 +40,9 @@ class BatchWorker(QtCore.QRunnable):
             
             # 2. Guardamos en disco duro (I/O intensivo)
             # Nota: output_fmt ya sabe dónde guardar gracias a que actualizamos el JSON en el diálogo
-            out_path = export_image(warped, self.file_name)
+            out_path = export_image(warped, self.file_name, self.parent_folder_name)
             
+            # TODO:
             '''3. (Futuro) Aquí agregaremos la exportación a IA'''
             
             # Avisamos que terminamos exitosamente
